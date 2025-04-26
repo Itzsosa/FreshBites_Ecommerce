@@ -1,0 +1,171 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+---
+
+<MainLayout title="Dashboard de Administrador">
+  <div class="bg-white rounded-lg shadow-md p-6">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">Dashboard de Administrador</h1>
+    
+    <!-- Menú de navegación -->
+    <div class="mb-8 flex flex-wrap gap-4">
+      <a href="/admin/categories" class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm">
+        <span class="mr-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        </span>
+        Gestionar Categorías
+      </a>
+      
+      <a href="/admin/products" class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm">
+        <span class="mr-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+        </span>
+        Gestionar Productos
+      </a>
+    </div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-green-50 p-6 rounded-lg shadow-sm">
+        <h2 class="text-lg font-semibold text-green-800 mb-2">Usuarios</h2>
+        <p class="text-3xl font-bold text-green-600" id="userCount">-</p>
+        <p class="text-sm text-green-700 mt-1">Usuarios registrados</p>
+      </div>
+      
+      <div class="bg-blue-50 p-6 rounded-lg shadow-sm">
+        <h2 class="text-lg font-semibold text-blue-800 mb-2">Productos</h2>
+        <p class="text-3xl font-bold text-blue-600" id="productCount">0</p>
+        <p class="text-sm text-blue-700 mt-1">Productos en catálogo</p>
+      </div>
+      
+      <div class="bg-purple-50 p-6 rounded-lg shadow-sm">
+        <h2 class="text-lg font-semibold text-purple-800 mb-2">Órdenes</h2>
+        <p class="text-3xl font-bold text-purple-600">0</p>
+        <p class="text-sm text-purple-700 mt-1">Pedidos totales</p>
+      </div>
+    </div>
+    
+    <div class="mt-8">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Usuarios Registrados</h2>
+      <div class="bg-gray-50 rounded-lg shadow-sm overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200" id="userTableBody">
+            <!-- Users will be populated here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Admin page protection - make sure user is admin
+    function checkAdminAuth() {
+      const userStr = localStorage.getItem('freshbites_current_user');
+      if (!userStr) {
+        // Not logged in, redirect to login
+        window.location.href = '/login';
+        return;
+      }
+      
+      const user = JSON.parse(userStr);
+      if (user.role !== 'admin') {
+        // Not an admin, redirect to user home
+        window.location.href = '/user/home';
+      }
+    }
+    
+    // Get registered users
+    function getUsers() {
+      const usersStr = localStorage.getItem('freshbites_users');
+      if (!usersStr) return [];
+      return JSON.parse(usersStr);
+    }
+    
+    // Get product count
+    function updateProductCount() {
+      const productsStr = localStorage.getItem('products');
+      const products = productsStr ? JSON.parse(productsStr) : [];
+      
+      const productCountElement = document.getElementById('productCount');
+      if (productCountElement) {
+        productCountElement.textContent = products.length.toString();
+      }
+    }
+    
+    // Populate users table
+    function populateUsersTable() {
+      const users = getUsers();
+      const tableBody = document.getElementById('userTableBody');
+      const userCount = document.getElementById('userCount');
+      
+      // Update count
+      userCount.textContent = users.length;
+      
+      // Clear table
+      tableBody.innerHTML = '';
+      
+      // Add user rows
+      users.forEach(user => {
+        const row = document.createElement('tr');
+        
+        // ID column
+        const idCell = document.createElement('td');
+        idCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+        idCell.textContent = user.id;
+        row.appendChild(idCell);
+        
+        // Name column
+        const nameCell = document.createElement('td');
+        nameCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900';
+        nameCell.textContent = user.name;
+        row.appendChild(nameCell);
+        
+        // Email column
+        const emailCell = document.createElement('td');
+        emailCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+        emailCell.textContent = user.email;
+        row.appendChild(emailCell);
+        
+        // Role column
+        const roleCell = document.createElement('td');
+        roleCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500';
+        
+        // Add badge for role
+        const roleBadge = document.createElement('span');
+        if (user.role === 'admin') {
+          roleBadge.className = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800';
+        } else {
+          roleBadge.className = 'px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800';
+        }
+        roleBadge.textContent = user.role;
+        roleCell.appendChild(roleBadge);
+        
+        row.appendChild(roleCell);
+        
+        tableBody.appendChild(row);
+      });
+    }
+    
+    // On document load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Verify admin access
+      checkAdminAuth();
+      
+      // Populate user information
+      populateUsersTable();
+      
+      // Update product count
+      updateProductCount();
+    });
+  </script>
+</MainLayout>

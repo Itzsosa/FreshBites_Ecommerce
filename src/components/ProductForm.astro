@@ -1,0 +1,229 @@
+---
+import FormInput from './FormInput.astro';
+import { Product } from '../services/productService';
+
+export interface Props {
+  product?: Product;
+  error?: string;
+}
+
+const { product, error = '' } = Astro.props;
+const isEditing = !!product;
+---
+
+<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+  <h2 class="text-xl font-semibold text-gray-800 mb-4">
+    {isEditing ? 'Editar Producto' : 'Crear Nuevo Producto'}
+  </h2>
+
+  <!-- El mensaje de advertencia (inicialmente oculto) -->
+  <div id="noCategoriesMessage" class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md p-4 mb-4 hidden">
+    <p>Debe crear categorías antes de poder añadir productos. <a href="/admin/categories" class="text-blue-600 underline">Ir a gestión de categorías</a></p>
+  </div>
+  
+  <!-- El formulario (inicialmente visible) -->
+  <form id="productForm" class="space-y-4">
+    {isEditing && <input type="hidden" id="productId" value={product.id} />}
+    
+    <FormInput
+      type="text"
+      name="productName"
+      label="Nombre del Producto"
+      value={product?.name || ''}
+      placeholder="Ingrese el nombre del producto"
+      error=""
+      required={true}
+    />
+    
+    <FormInput
+      type="number"
+      name="productPrice"
+      label="Precio"
+      value={product?.price?.toString() || ''}
+      placeholder="0.00"
+      error=""
+      required={true}
+      min="0.01"
+      step="0.01"
+    />
+    
+    <div class="mb-4">
+      <label for="productDescription" class="block text-sm font-medium text-gray-700">Descripción</label>
+      <textarea
+        id="productDescription"
+        name="productDescription"
+        rows="3"
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+        placeholder="Descripción del producto (min. 10 caracteres)"
+      >{product?.description || ''}</textarea>
+      <p class="mt-1 text-xs text-gray-500">Opcional, mínimo 10 caracteres si se proporciona</p>
+    </div>
+    
+    <div class="mb-4">
+      <label for="productCategory" class="block text-sm font-medium text-gray-700">Categoría</label>
+      <select
+        id="productCategory"
+        name="productCategory"
+        required
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
+      >
+        <option value="" disabled selected={!isEditing}>Seleccione una categoría</option>
+        <!-- Las categorías se cargarán dinámicamente con JavaScript -->
+      </select>
+    </div>
+    
+    <div class="mb-4">
+      <label for="productImage" class="block text-sm font-medium text-gray-700">Imagen del Producto</label>
+      <input
+        type="file"
+        id="productImage"
+        name="productImage"
+        accept="image/*"
+        class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+      />
+      <p class="mt-1 text-xs text-gray-500">Opcional, tamaño máximo recomendado: 1MB</p>
+      
+      {isEditing && product.imageBase64 && (
+        <div class="mt-2">
+          <p class="text-sm text-gray-500 mb-1">Imagen actual:</p>
+          <img 
+            src={product.imageBase64} 
+            alt="Preview" 
+            class="h-20 w-20 object-cover rounded-md"
+            id="currentImage" 
+          />
+          <div class="mt-1">
+            <label class="inline-flex items-center">
+              <input type="checkbox" id="keepCurrentImage" name="keepCurrentImage" class="rounded border-gray-300 text-green-600 shadow-sm focus:border-green-300 focus:ring focus:ring-green-200 focus:ring-opacity-50" checked={true} />
+              <span class="ml-2 text-sm text-gray-600">Mantener esta imagen</span>
+            </label>
+          </div>
+        </div>
+      )}
+      
+      <div class="mt-2 hidden" id="imagePreviewContainer">
+        <p class="text-sm text-gray-500 mb-1">Vista previa:</p>
+        <img id="imagePreview" class="h-20 w-20 object-cover rounded-md" />
+      </div>
+    </div>
+    
+    <div class="flex justify-end">
+      {isEditing && (
+        <button 
+          type="button" 
+          id="cancelButton"
+          class="mr-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+      )}
+      <button 
+        type="submit" 
+        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+      >
+        {isEditing ? 'Actualizar' : 'Crear'}
+      </button>
+    </div>
+  </form>
+  
+  <!-- Alertas de notificación -->
+  <div id="successAlert" class="hidden mt-4 p-4 rounded-md bg-green-50 text-green-800">
+    <span id="successMessage"></span>
+  </div>
+  
+  <div id="errorAlert" class="hidden mt-4 p-4 rounded-md bg-red-50 text-red-800">
+    <span id="errorMessage">{error}</span>
+  </div>
+</div>
+
+<script define:vars={{ productId: product?.id, productCategoryId: product?.categoryId }}>
+  // Cargar las categorías desde localStorage directamente
+  document.addEventListener('DOMContentLoaded', () => {
+    // Función para obtener categorías
+    function getCategories() {
+      const categoriesStr = localStorage.getItem('categories');
+      console.log('Datos crudos de categorías:', categoriesStr);
+      
+      if (categoriesStr) {
+        try {
+          const categories = JSON.parse(categoriesStr);
+          console.log('Categorías encontradas:', categories.length);
+          return categories;
+        } catch (e) {
+          console.error('Error al parsear categorías:', e);
+        }
+      }
+      
+      // Si no hay categorías, crear una categoría de respaldo para pruebas
+      console.log('Creando categoría de respaldo');
+      const backupCategory = { id: 'backup-category', name: 'Categoría General' };
+      localStorage.setItem('categories', JSON.stringify([backupCategory]));
+      return [backupCategory];
+    }
+    
+    // Obtener categorías
+    const categories = getCategories();
+    const productForm = document.getElementById('productForm');
+    const noCategoriesMessage = document.getElementById('noCategoriesMessage');
+    const categorySelect = document.getElementById('productCategory');
+    
+    // Actualizar la interfaz según si hay categorías o no
+    if (categories.length > 0) {
+      if (noCategoriesMessage) noCategoriesMessage.classList.add('hidden');
+      
+      // Llenar el selector de categorías
+      if (categorySelect) {
+        // Mantener la opción por defecto
+        const defaultOption = categorySelect.querySelector('option');
+        
+        // Limpiar opciones existentes excepto la por defecto
+        categorySelect.innerHTML = '';
+        if (defaultOption) categorySelect.appendChild(defaultOption);
+        
+        // Añadir categorías como opciones
+        categories.forEach(category => {
+          const option = document.createElement('option');
+          option.value = category.id;
+          option.textContent = category.name;
+          
+          // Si estamos editando, seleccionar la categoría actual
+          if (productCategoryId === category.id) {
+            option.selected = true;
+          }
+          
+          categorySelect.appendChild(option);
+        });
+      }
+    } else {
+      // En caso de que no haya categorías (extremadamente improbable después de nuestros cambios)
+      if (productForm) productForm.classList.add('hidden');
+      if (noCategoriesMessage) noCategoriesMessage.classList.remove('hidden');
+    }
+  });
+  
+  // Preview de la imagen
+  const imageInput = document.getElementById('productImage');
+  const previewContainer = document.getElementById('imagePreviewContainer');
+  const imagePreview = document.getElementById('imagePreview');
+  const keepCurrentCheckbox = document.getElementById('keepCurrentImage');
+  
+  if (imageInput) {
+    imageInput.addEventListener('change', function() {
+      if (this.files && this.files[0]) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+          if (previewContainer) previewContainer.classList.remove('hidden');
+          if (imagePreview && e.target) imagePreview.src = e.target.result;
+          
+          // Si hay checkbox de mantener imagen actual, desmarcarlo
+          if (keepCurrentCheckbox) keepCurrentCheckbox.checked = false;
+        };
+        
+        reader.readAsDataURL(this.files[0]);
+      } else {
+        if (previewContainer) previewContainer.classList.add('hidden');
+      }
+    });
+  }
+</script>

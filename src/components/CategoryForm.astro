@@ -1,0 +1,63 @@
+---
+import FormInput from './FormInput.astro';
+import { Category } from '../services/categoryService';
+
+export interface Props {
+  category?: Category;
+  error?: string;
+}
+
+const { category, error = '' } = Astro.props;
+const isEditing = !!category;
+---
+
+<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+  <h2 class="text-xl font-semibold text-gray-800 mb-4">
+    {isEditing ? 'Editar Categoría' : 'Crear Nueva Categoría'}
+  </h2>
+  
+  <form id="categoryForm" class="space-y-4">
+    {isEditing && <input type="hidden" id="categoryId" value={category.id} />}
+    
+    <FormInput
+      type="text"
+      name="categoryName"
+      label="Nombre de la Categoría"
+      value={category?.name || ''}
+      placeholder="Ingrese el nombre de la categoría"
+      error=""
+      required={true}
+    />
+    
+    <div class="flex justify-end">
+      {isEditing && (
+        <button 
+          type="button" 
+          id="cancelButton"
+          class="mr-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+      )}
+      <button 
+        type="submit" 
+        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+      >
+        {isEditing ? 'Actualizar' : 'Crear'}
+      </button>
+    </div>
+  </form>
+  
+  <!-- Alertas de notificación -->
+  <div id="successAlert" class="hidden mt-4 p-4 rounded-md bg-green-50 text-green-800">
+    <span id="successMessage"></span>
+  </div>
+  
+  <div id="errorAlert" class="hidden mt-4 p-4 rounded-md bg-red-50 text-red-800">
+    <span id="errorMessage">{error}</span>
+  </div>
+</div>
+
+<script>
+  // Esta lógica se manejará desde la página principal
+</script>

@@ -1,0 +1,359 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import CategoryForm from '../../components/CategoryForm.astro';
+import CategoryList from '../../components/CategoryList.astro';
+import { getCategories } from '../../services/categoryService';
+
+// Obtener categorías (esto se ejecutará en el servidor durante la compilación)
+// En el cliente, las categorías se cargarán dinámicamente con JavaScript
+const initialCategories = [];
+---
+
+<MainLayout title="Administración de Categorías">
+  <div class="space-y-6">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-gray-800">Administración de Categorías</h1>
+      <a href="/admin/dashboard" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md text-sm font-medium text-gray-700">
+        Volver al Dashboard
+      </a>
+    </div>
+    
+    <!-- Alertas para mensajes de éxito y error -->
+    <div id="successAlert" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+      <span id="successMessage" class="block sm:inline"></span>
+    </div>
+    
+    <div id="errorAlert" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+      <span id="errorMessage" class="block sm:inline"></span>
+    </div>
+    
+    <!-- Formulario de Categoría -->
+    <CategoryForm />
+    
+    <!-- Listado de Categorías -->
+    <CategoryList categories={initialCategories} />
+  </div>
+  
+  <script>
+    import { 
+      getCategories, 
+      createCategory, 
+      updateCategory, 
+      deleteCategory,
+      getCategoryById
+    } from '../../services/categoryService';
+    
+    // Verificar que el usuario es administrador
+    function checkAdminAuth() {
+      const userStr = localStorage.getItem('freshbites_current_user');
+      if (!userStr) {
+        // No ha iniciado sesión, redirigir al login
+        window.location.href = '/login';
+        return;
+      }
+      
+      const user = JSON.parse(userStr);
+      if (user.role !== 'admin') {
+        // No es administrador, redirigir a la página de usuario
+        window.location.href = '/user/home';
+      }
+    }
+    
+    // Cargar categorías y actualizar la tabla
+    function loadCategories() {
+      // Obtener las categorías directamente del localStorage para asegurar datos actualizados
+      const categoriesStr = localStorage.getItem('categories');
+      const categories = categoriesStr ? JSON.parse(categoriesStr) : [];
+      updateCategoryTable(categories);
+    }
+    
+    // Actualizar la tabla de categorías
+    function updateCategoryTable(categories) {
+      const tableBody = document.getElementById('categoryTableBody');
+      if (!tableBody) return;
+      
+      // Limpiar la tabla
+      tableBody.innerHTML = '';
+      
+      if (categories.length === 0) {
+        // Si no hay categorías, mostrar mensaje
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = `
+          <td colspan="3" class="px-6 py-4 text-center text-gray-500">
+            No hay categorías disponibles.
+          </td>
+        `;
+        tableBody.appendChild(emptyRow);
+        return;
+      }
+      
+      // Agregar filas de categorías
+      categories.forEach(category => {
+        const row = document.createElement('tr');
+        row.className = 'category-row';
+        row.dataset.id = category.id;
+        
+        row.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            ${category.id}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+            ${category.name}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+            <button 
+              class="edit-button text-indigo-600 hover:text-indigo-900 mr-4"
+              data-id="${category.id}"
+            >
+              Editar
+            </button>
+            <button 
+              class="delete-button text-red-600 hover:text-red-900"
+              data-id="${category.id}"
+            >
+              Eliminar
+            </button>
+          </td>
+        `;
+        
+        tableBody.appendChild(row);
+      });
+      
+      // Añadir event listeners a los botones
+      addButtonEventListeners();
+    }
+    
+    // Añadir event listeners a los botones de editar y eliminar
+    function addButtonEventListeners() {
+      // Botones de editar
+      document.querySelectorAll('.edit-button').forEach(button => {
+        button.addEventListener('click', handleEditCategory);
+      });
+      
+      // Botones de eliminar
+      document.querySelectorAll('.delete-button').forEach(button => {
+        button.addEventListener('click', handleDeleteCategory);
+      });
+    }
+    
+    // Manejar la creación de categoría
+    function handleCreateCategory(event) {
+      event.preventDefault();
+      
+      // Obtener el valor del input
+      const nameInput = document.querySelector('#categoryName') as HTMLInputElement;
+      const categoryName = nameInput.value.trim();
+      
+      // Validar el nombre (mínimo 3 caracteres)
+      if (categoryName.length < 3) {
+        showError('El nombre de la categoría debe tener al menos 3 caracteres');
+        return;
+      }
+      
+      // Crear la categoría
+      const result = createCategory(categoryName);
+      
+      if (result.success) {
+        // Mostrar mensaje de éxito
+        showSuccess(result.message);
+        
+        // Limpiar el formulario
+        nameInput.value = '';
+        
+        // Disparar evento de actualización de categorías
+        window.dispatchEvent(new CustomEvent('categoriesUpdated'));
+        
+        // Recargar la lista de categorías (para los botones de acción)
+        loadCategories();
+      } else {
+        // Mostrar mensaje de error
+        showError(result.message);
+      }
+    }
+    
+    // Manejar la edición de categoría
+    function handleEditCategory(event) {
+      const categoryId = event.target.dataset.id;
+      const category = getCategoryById(categoryId);
+      
+      if (!category) {
+        showError('Categoría no encontrada');
+        return;
+      }
+      
+      // Cambiar formulario a modo edición
+      setFormToEditMode(category);
+    }
+    
+    // Establecer el formulario en modo edición
+    function setFormToEditMode(category) {
+      const form = document.getElementById('categoryForm');
+      const nameInput = document.querySelector('#categoryName') as HTMLInputElement;
+      const submitButton = form.querySelector('button[type="submit"]');
+      const categoryIdInput = document.getElementById('categoryId') as HTMLInputElement || document.createElement('input');
+      
+      // Crear input oculto para el ID si no existe
+      if (!document.getElementById('categoryId')) {
+        categoryIdInput.type = 'hidden';
+        categoryIdInput.id = 'categoryId';
+        form.appendChild(categoryIdInput);
+      }
+      
+      // Establecer valores
+      categoryIdInput.value = category.id;
+      nameInput.value = category.name;
+      submitButton.textContent = 'Actualizar';
+      
+      // Añadir botón de cancelar si no existe
+      if (!document.getElementById('cancelButton')) {
+        const cancelButton = document.createElement('button');
+        cancelButton.id = 'cancelButton';
+        cancelButton.type = 'button';
+        cancelButton.className = 'mr-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50';
+        cancelButton.textContent = 'Cancelar';
+        cancelButton.addEventListener('click', resetForm);
+        submitButton.parentNode.insertBefore(cancelButton, submitButton);
+      } else {
+        document.getElementById('cancelButton').classList.remove('hidden');
+      }
+      
+      // Cambiar el event listener del formulario
+      form.removeEventListener('submit', handleCreateCategory);
+      form.addEventListener('submit', handleUpdateCategory);
+    }
+    
+    // Manejar la actualización de categoría
+    function handleUpdateCategory(event) {
+      event.preventDefault();
+      
+      // Obtener valores
+      const categoryIdInput = document.getElementById('categoryId') as HTMLInputElement;
+      const nameInput = document.querySelector('#categoryName') as HTMLInputElement;
+      const categoryId = categoryIdInput.value;
+      const categoryName = nameInput.value.trim();
+      
+      // Validar el nombre (mínimo 3 caracteres)
+      if (categoryName.length < 3) {
+        showError('El nombre de la categoría debe tener al menos 3 caracteres');
+        return;
+      }
+      
+      // Actualizar la categoría
+      const result = updateCategory(categoryId, categoryName);
+      
+      if (result.success) {
+        // Mostrar mensaje de éxito
+        showSuccess(result.message);
+        
+        // Volver a modo creación
+        resetForm();
+        
+        // Disparar evento de actualización de categorías
+        window.dispatchEvent(new CustomEvent('categoriesUpdated'));
+        
+        // Recargar la lista de categorías (para los botones de acción)
+        loadCategories();
+      } else {
+        // Mostrar mensaje de error
+        showError(result.message);
+      }
+    }
+    
+    // Manejar la eliminación de categoría
+    function handleDeleteCategory(event) {
+      const categoryId = event.target.dataset.id;
+      
+      // Confirmar antes de eliminar
+      if (!confirm('¿Estás seguro de que deseas eliminar esta categoría? Esta acción no se puede deshacer.')) {
+        return;
+      }
+      
+      // Eliminar la categoría
+      const result = deleteCategory(categoryId);
+      
+      if (result.success) {
+        // Mostrar mensaje de éxito
+        showSuccess(result.message);
+        
+        // Disparar evento de actualización de categorías
+        window.dispatchEvent(new CustomEvent('categoriesUpdated'));
+        
+        // Recargar la lista de categorías (para los botones de acción)
+        loadCategories();
+      } else {
+        // Mostrar mensaje de error
+        showError(result.message);
+      }
+    }
+    
+    // Resetear el formulario a su estado inicial
+    function resetForm() {
+      const form = document.getElementById('categoryForm');
+      const nameInput = document.querySelector('#categoryName') as HTMLInputElement;
+      const submitButton = form.querySelector('button[type="submit"]');
+      const cancelButton = document.getElementById('cancelButton');
+      
+      // Limpiar el valor del nombre
+      nameInput.value = '';
+      
+      // Cambiar el texto del botón
+      submitButton.textContent = 'Crear';
+      
+      // Ocultar el botón de cancelar
+      if (cancelButton) {
+        cancelButton.classList.add('hidden');
+      }
+      
+      // Remover el event listener de actualización
+      form.removeEventListener('submit', handleUpdateCategory);
+      
+      // Añadir el event listener de creación
+      form.addEventListener('submit', handleCreateCategory);
+    }
+    
+    // Mostrar mensaje de éxito
+    function showSuccess(message) {
+      const successAlert = document.getElementById('successAlert');
+      const successMessage = document.getElementById('successMessage');
+      
+      if (successAlert && successMessage) {
+        successMessage.textContent = message;
+        successAlert.classList.remove('hidden');
+        
+        // Ocultar después de 3 segundos
+        setTimeout(() => {
+          successAlert.classList.add('hidden');
+        }, 3000);
+      }
+    }
+    
+    // Mostrar mensaje de error
+    function showError(message) {
+      const errorAlert = document.getElementById('errorAlert');
+      const errorMessage = document.getElementById('errorMessage');
+      
+      if (errorAlert && errorMessage) {
+        errorMessage.textContent = message;
+        errorAlert.classList.remove('hidden');
+        
+        // Ocultar después de 3 segundos
+        setTimeout(() => {
+          errorAlert.classList.add('hidden');
+        }, 3000);
+      }
+    }
+    
+    // Inicializar la página
+    document.addEventListener('DOMContentLoaded', () => {
+      // Verificar acceso de administrador
+      checkAdminAuth();
+      
+      // Cargar categorías
+      loadCategories();
+      
+      // Configurar event listener para el formulario
+      const form = document.getElementById('categoryForm');
+      form.addEventListener('submit', handleCreateCategory);
+    });
+  </script>
+</MainLayout>

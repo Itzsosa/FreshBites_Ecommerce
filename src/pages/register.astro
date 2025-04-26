@@ -1,0 +1,238 @@
+---
+import AuthLayout from '../layouts/AuthLayout.astro';
+import FormInput from '../components/FormInput.astro';
+import { validateRegisterForm } from '../utils/validators';
+---
+
+<AuthLayout title="Crear Cuenta">
+  <form id="registerForm" class="space-y-6">
+    <FormInput
+      type="text"
+      name="name"
+      label="Nombre Completo"
+      value=""
+      placeholder="Tu nombre completo"
+      required={true}
+    />
+    
+    <FormInput
+      type="email"
+      name="email"
+      label="Correo Electrónico"
+      value=""
+      placeholder="tu@email.com"
+      required={true}
+    />
+    
+    <FormInput
+      type="password"
+      name="password"
+      label="Contraseña"
+      value=""
+      placeholder="Tu contraseña"
+      required={true}
+    />
+    
+    <FormInput
+      type="password"
+      name="confirmPassword"
+      label="Confirmar Contraseña"
+      value=""
+      placeholder="Confirma tu contraseña"
+      required={true}
+    />
+    
+    <div id="formError" class="text-red-500 text-sm hidden"></div>
+    <div id="formSuccess" class="text-green-500 text-sm hidden"></div>
+    
+    <div>
+      <button
+        type="submit"
+        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+      >
+        Crear Cuenta
+      </button>
+    </div>
+  </form>
+  
+  <div class="mt-6">
+    <div class="relative">
+      <div class="absolute inset-0 flex items-center">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-center text-sm">
+        <span class="px-2 bg-white text-gray-500">
+          ¿Ya tienes una cuenta?
+        </span>
+      </div>
+    </div>
+    
+    <div class="mt-6">
+      <a
+        href="/login"
+        class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+      >
+        Iniciar sesión
+      </a>
+    </div>
+  </div>
+
+  <script>
+    // Initialize auth service
+    function initializeAuth() {
+      const ADMIN_USER = {
+        id: 'admin-id',
+        name: 'Administrador',
+        email: 'admin@admin.com',
+        password: 'admin1234',
+        role: 'admin'
+      };
+      
+      const USERS_KEY = 'freshbites_users';
+      const users = localStorage.getItem(USERS_KEY);
+      if (!users) {
+        localStorage.setItem(USERS_KEY, JSON.stringify([ADMIN_USER]));
+      }
+    }
+    
+    // Validate the form
+    function validateForm(name, email, password, confirmPassword) {
+      const errors = {};
+      
+      if (!name.trim()) {
+        errors.name = 'El nombre es requerido';
+      }
+      
+      if (!email.trim()) {
+        errors.email = 'El correo electrónico es requerido';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.email = 'Ingrese un correo electrónico válido';
+      }
+      
+      if (!password.trim()) {
+        errors.password = 'La contraseña es requerida';
+      } else if (password.length < 6) {
+        errors.password = 'La contraseña debe tener al menos 6 caracteres';
+      }
+      
+      if (!confirmPassword.trim()) {
+        errors.confirmPassword = 'Confirme su contraseña';
+      } else if (password !== confirmPassword) {
+        errors.confirmPassword = 'Las contraseñas no coinciden';
+      }
+      
+      return {
+        isValid: Object.keys(errors).length === 0,
+        errors
+      };
+    }
+    
+    // Register a new user
+    function registerUser(userData) {
+      try {
+        const USERS_KEY = 'freshbites_users';
+        
+        // Get existing users
+        const usersStr = localStorage.getItem(USERS_KEY);
+        const users = usersStr ? JSON.parse(usersStr) : [];
+        
+        // Check if email already exists
+        if (users.some(user => user.email === userData.email)) {
+          return { success: false, message: 'El correo electrónico ya está registrado' };
+        }
+        
+        // Create new user
+        const newUser = {
+          id: Date.now().toString(),
+          name: userData.name,
+          email: userData.email,
+          password: userData.password,
+          role: 'user' // All registered users are 'user' by default
+        };
+        
+        // Add to users array and save to localStorage
+        users.push(newUser);
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        
+        return { success: true, message: 'Usuario registrado correctamente' };
+      } catch (error) {
+        return { success: false, message: 'Error al registrar el usuario' };
+      }
+    }
+    
+    // Check if already logged in
+    function checkAuthenticated() {
+      const userStr = localStorage.getItem('freshbites_current_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        // Redirect based on role
+        if (user.role === 'admin') {
+          window.location.href = '/admin/dashboard';
+        } else {
+          window.location.href = '/user/home';
+        }
+      }
+    }
+    
+    // On document load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize auth with admin user
+      initializeAuth();
+      
+      // Check if user is already logged in
+      checkAuthenticated();
+      
+      // Get form elements
+      const form = document.getElementById('registerForm');
+      const formError = document.getElementById('formError');
+      const formSuccess = document.getElementById('formSuccess');
+      
+      // Handle form submission
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        // Clear previous messages
+        formError.classList.add('hidden');
+        formSuccess.classList.add('hidden');
+        
+        // Get form data
+        const formData = new FormData(form);
+        const name = formData.get('name');
+        const email = formData.get('email');
+        const password = formData.get('password');
+        const confirmPassword = formData.get('confirmPassword');
+        
+        // Validate the form
+        const validation = validateForm(name, email, password, confirmPassword);
+        if (!validation.isValid) {
+          // Display the first error
+          const firstError = Object.values(validation.errors)[0];
+          formError.textContent = firstError;
+          formError.classList.remove('hidden');
+          return;
+        }
+        
+        // Register the user
+        const result = registerUser({ name, email, password, confirmPassword });
+        
+        if (result.success) {
+          // Show success message
+          formSuccess.textContent = result.message;
+          formSuccess.classList.remove('hidden');
+          
+          // Reset form
+          form.reset();
+          
+          // Redirect to login after a delay
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 2000);
+        } else {
+          // Show error message
+          formError.textContent = result.message;
+          formError.classList.remove('hidden');
+        }
+      });
+    });
+  </script>
+</AuthLayout>

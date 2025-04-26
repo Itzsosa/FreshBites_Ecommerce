@@ -1,0 +1,66 @@
+---
+import { Product } from '../services/productService';
+import { getCategoryById } from '../services/categoryService';
+
+export interface Props {
+  product: Product;
+}
+
+const { product } = Astro.props;
+
+// Formatear precio
+const formatPrice = (price: number) => {
+  return new Intl.NumberFormat('es-CR', {
+    style: 'currency',
+    currency: 'CRC'
+  }).format(price);
+};
+
+// Obtener nombre de categoría
+const category = getCategoryById(product.categoryId);
+const categoryName = category ? category.name : 'Sin categoría';
+---
+
+<div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+  <div class="h-48 bg-gray-100 flex items-center justify-center overflow-hidden">
+    {product.imageBase64 ? (
+      <img 
+        src={product.imageBase64} 
+        alt={product.name} 
+        class="h-full w-full object-cover"
+      />
+    ) : (
+      <span class="text-gray-500">Imagen no disponible</span>
+    )}
+  </div>
+  <div class="p-4">
+    <div class="flex justify-between items-start">
+      <h3 class="text-lg font-medium text-gray-900">{product.name}</h3>
+      <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+        {categoryName}
+      </span>
+    </div>
+    {product.description && (
+      <p class="text-gray-600 mt-2 text-sm line-clamp-2">{product.description}</p>
+    )}
+    <div class="mt-3 flex justify-between items-center">
+      <span class="text-green-600 font-medium">{formatPrice(product.price)}</span>
+      <button 
+        class="bg-green-600 hover:bg-green-700 text-white text-sm py-1.5 px-3 rounded"
+        data-product-id={product.id}
+        id={`add-to-cart-${product.id}`}
+      >
+        Agregar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ productId: product.id }}>
+  // Agregar evento al botón
+  document.getElementById(`add-to-cart-${productId}`)?.addEventListener('click', () => {
+    // Aquí iría la lógica para agregar al carrito
+    // Por ahora solo mostramos una alerta
+    alert(`Producto agregado al carrito: ${productId}`);
+  });
+</script>

@@ -1,0 +1,512 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import ProductForm from '../../components/ProductForm.astro';
+import ProductList from '../../components/ProductList.astro';
+import { getProducts } from '../../services/productService';
+
+// Obtener todos los productos (solo para renderizado inicial)
+const initialProducts = [];
+---
+
+<MainLayout title="Administración de Productos">
+  <div class="space-y-6">
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-gray-800">Administración de Productos</h1>
+      <a href="/admin/dashboard" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md text-sm font-medium text-gray-700">
+        Volver al Dashboard
+      </a>
+    </div>
+    
+    <!-- Alertas para mensajes de éxito y error -->
+    <div id="successAlert" class="hidden bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
+      <span id="successMessage" class="block sm:inline"></span>
+    </div>
+    
+    <div id="errorAlert" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+      <span id="errorMessage" class="block sm:inline"></span>
+    </div>
+    
+    <!-- Sección de Formulario y Lista -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="col-span-1">
+        <!-- Formulario de Producto -->
+        <ProductForm />
+      </div>
+      <div class="col-span-1 lg:col-span-2" id="productListContainer">
+        <!-- Listado de Productos -->
+        <ProductList products={initialProducts} />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { 
+      createProduct, 
+      getProducts, 
+      getProductById, 
+      updateProduct, 
+      deleteProduct 
+    } from '../../services/productService';
+    import { getCategoryById } from '../../services/categoryService';
+    
+    // Referencias a elementos del DOM
+    const productForm = document.getElementById('productForm');
+    const successAlert = document.getElementById('successAlert');
+    const successMessage = document.getElementById('successMessage');
+    const errorAlert = document.getElementById('errorAlert');
+    const errorMessage = document.getElementById('errorMessage');
+    const deleteModal = document.getElementById('deleteModal');
+    
+    let currentProductId: string | null = null;
+    let editMode = false;
+    
+    // Función para actualizar la lista de productos dinámicamente
+    function updateProductList() {
+      const products = getProducts();
+      const productListContainer = document.getElementById('productListContainer');
+      
+      if (!productListContainer) return;
+      
+      // Si no hay productos, mostrar mensaje
+      if (products.length === 0) {
+        productListContainer.innerHTML = `
+          <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Lista de Productos</h2>
+            <div class="text-center py-4 text-gray-500">
+              No hay productos registrados. ¡Crea tu primer producto!
+            </div>
+          </div>
+        `;
+        return;
+      }
+      
+      // Formatear precio 
+      const formatPrice = (price) => {
+        return new Intl.NumberFormat('es-CR', {
+          style: 'currency',
+          currency: 'CRC'
+        }).format(price);
+      };
+      
+      // Obtener nombre de categoría
+      const getCategoryName = (categoryId) => {
+        const category = getCategoryById(categoryId);
+        return category ? category.name : 'Categoría no encontrada';
+      };
+      
+      // Crear tabla HTML con productos
+      let productsHtml = `
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h2 class="text-xl font-semibold text-gray-800 mb-4">Lista de Productos</h2>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Producto
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Precio
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Categoría
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Acciones
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200" id="productTableBody">
+      `;
+      
+      // Agregar filas de productos
+      products.forEach(product => {
+        productsHtml += `
+          <tr class="product-row hover:bg-gray-50" id="product-${product.id}" data-id="${product.id}">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex items-center">
+                <div class="h-10 w-10 flex-shrink-0">
+                  ${product.imageBase64 
+                    ? `<img class="h-10 w-10 rounded-full object-cover" src="${product.imageBase64}" alt="${product.name}" />`
+                    : `<div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                        <span class="text-gray-500 text-xs">Sin img</span>
+                      </div>`
+                  }
+                </div>
+                <div class="ml-4">
+                  <div class="text-sm font-medium text-gray-900">
+                    ${product.name}
+                  </div>
+                  ${product.description 
+                    ? `<div class="text-sm text-gray-500 truncate max-w-xs">${product.description}</div>`
+                    : ''
+                  }
+                </div>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              ${formatPrice(product.price)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                ${getCategoryName(product.categoryId)}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <button
+                class="edit-button text-indigo-600 hover:text-indigo-900 mr-4"
+                data-id="${product.id}"
+              >
+                Editar
+              </button>
+              <button
+                class="delete-button text-red-600 hover:text-red-900"
+                data-id="${product.id}"
+              >
+                Eliminar
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+      
+      // Cerrar tabla
+      productsHtml += `
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Modal de Confirmación para Eliminar -->
+          <div id="deleteModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg max-w-md w-full p-6">
+              <h3 class="text-lg font-medium text-gray-900 mb-4">Confirmar Eliminación</h3>
+              <p class="text-sm text-gray-500 mb-4">
+                ¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.
+              </p>
+              <div class="flex justify-end">
+                <button
+                  id="cancelDelete"
+                  class="mr-2 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  id="confirmDelete"
+                  class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Actualizar el contenedor con la nueva lista
+      productListContainer.innerHTML = productsHtml;
+      
+      // Volver a agregar event listeners a los nuevos botones
+      setupEventListeners();
+    }
+    
+    // Configurar event listeners para los botones después de actualizar
+    function setupEventListeners() {
+      // Configurar event listeners para botones de editar y eliminar
+      document.querySelectorAll('.edit-button').forEach(button => {
+        button.addEventListener('click', handleEditClick);
+      });
+      
+      document.querySelectorAll('.delete-button').forEach(button => {
+        button.addEventListener('click', handleDeleteClick);
+      });
+      
+      // Configurar event listeners para el modal
+      const deleteModal = document.getElementById('deleteModal');
+      const confirmDeleteBtn = document.getElementById('confirmDelete');
+      const cancelDeleteBtn = document.getElementById('cancelDelete');
+      
+      if (confirmDeleteBtn) {
+        confirmDeleteBtn.addEventListener('click', handleConfirmDelete);
+      }
+      
+      if (cancelDeleteBtn) {
+        cancelDeleteBtn.addEventListener('click', () => {
+          if (deleteModal) {
+            deleteModal.classList.add('hidden');
+          }
+          currentProductId = null;
+        });
+      }
+      
+      if (deleteModal) {
+        deleteModal.addEventListener('click', (e) => {
+          if (e.target === deleteModal) {
+            deleteModal.classList.add('hidden');
+            currentProductId = null;
+          }
+        });
+      }
+    }
+    
+    // Manejador para clic en botón editar
+    function handleEditClick(e) {
+      const productId = e.currentTarget.getAttribute('data-id');
+      if (productId) {
+        const product = getProductById(productId);
+        if (product) {
+          currentProductId = productId;
+          editMode = true;
+          
+          // Llenar el formulario con los datos del producto
+          const nameInput = document.getElementById('productName') as HTMLInputElement;
+          const priceInput = document.getElementById('productPrice') as HTMLInputElement;
+          const descriptionInput = document.getElementById('productDescription') as HTMLTextAreaElement;
+          const categorySelect = document.getElementById('productCategory') as HTMLSelectElement;
+          const cancelButton = document.getElementById('cancelButton');
+          
+          if (nameInput) nameInput.value = product.name;
+          if (priceInput) priceInput.value = product.price.toString();
+          if (descriptionInput) descriptionInput.value = product.description || '';
+          if (categorySelect) categorySelect.value = product.categoryId;
+          if (cancelButton) cancelButton.classList.remove('hidden');
+          
+          // Scroll al formulario
+          productForm?.scrollIntoView({ behavior: 'smooth' });
+          
+          // Cambiar el botón de crear a actualizar
+          const submitButton = productForm?.querySelector('button[type="submit"]');
+          if (submitButton) {
+            submitButton.textContent = 'Actualizar';
+          }
+        }
+      }
+    }
+    
+    // Manejador para clic en botón eliminar
+    function handleDeleteClick(e) {
+      const productId = e.currentTarget.getAttribute('data-id');
+      if (productId && deleteModal) {
+        currentProductId = productId;
+        deleteModal.classList.remove('hidden');
+      }
+    }
+    
+    // Manejador para confirmar eliminación
+    function handleConfirmDelete() {
+      if (currentProductId) {
+        const result = deleteProduct(currentProductId);
+        
+        if (result.success) {
+          showAlert('success', result.message);
+          
+          // Actualizar la lista de productos
+          updateProductList();
+        } else {
+          showAlert('error', result.message);
+        }
+        
+        // Cerrar el modal
+        const deleteModal = document.getElementById('deleteModal');
+        if (deleteModal) {
+          deleteModal.classList.add('hidden');
+        }
+        
+        currentProductId = null;
+      }
+    }
+    
+    // Función para mostrar alertas
+    const showAlert = (type: 'success' | 'error', message: string) => {
+      if (type === 'success') {
+        if (successAlert && successMessage) {
+          successMessage.textContent = message;
+          successAlert.classList.remove('hidden');
+          setTimeout(() => {
+            successAlert.classList.add('hidden');
+          }, 3000);
+        }
+      } else {
+        if (errorAlert && errorMessage) {
+          errorMessage.textContent = message;
+          errorAlert.classList.remove('hidden');
+          setTimeout(() => {
+            errorAlert.classList.add('hidden');
+          }, 3000);
+        }
+      }
+    };
+    
+    // Función para limpiar el formulario
+    const resetForm = () => {
+      if (productForm) {
+        (productForm as HTMLFormElement).reset();
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        if (imagePreviewContainer) {
+          imagePreviewContainer.classList.add('hidden');
+        }
+        
+        // Cambiar el botón de actualizar a crear
+        const submitButton = productForm?.querySelector('button[type="submit"]');
+        if (submitButton) {
+          submitButton.textContent = 'Crear';
+        }
+        
+        // Ocultar botón cancelar
+        const cancelButton = document.getElementById('cancelButton');
+        if (cancelButton) {
+          cancelButton.classList.add('hidden');
+        }
+      }
+      editMode = false;
+      currentProductId = null;
+    };
+    
+    // Función para convertir la imagen a base64
+    const convertImageToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+      });
+    };
+
+    // Manejador para crear/actualizar producto
+    if (productForm) {
+      productForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const form = e.currentTarget as HTMLFormElement;
+        const formData = new FormData(form);
+        
+        const name = formData.get('productName') as string;
+        const price = parseFloat((formData.get('productPrice') as string) || '0');
+        const description = formData.get('productDescription') as string;
+        const categoryId = formData.get('productCategory') as string;
+        const imageFile = (document.getElementById('productImage') as HTMLInputElement).files?.[0];
+        
+        // Validaciones básicas
+        if (!name.trim()) {
+          showAlert('error', 'El nombre del producto es obligatorio');
+          return;
+        }
+        
+        if (isNaN(price) || price <= 0) {
+          showAlert('error', 'El precio debe ser un número positivo');
+          return;
+        }
+        
+        if (description && description.length < 10) {
+          showAlert('error', 'La descripción debe tener al menos 10 caracteres');
+          return;
+        }
+        
+        if (!categoryId) {
+          showAlert('error', 'Debe seleccionar una categoría');
+          return;
+        }
+        
+        // Preparar datos del producto
+        const productData: any = {
+          name: name.trim(),
+          price,
+          categoryId,
+        };
+        
+        if (description) {
+          productData.description = description.trim();
+        }
+        
+        // Manejar la imagen
+        // Para producto existente
+        if (editMode && currentProductId) {
+          const keepExistingImage = document.getElementById('keepCurrentImage') as HTMLInputElement;
+          
+          if (keepExistingImage && keepExistingImage.checked) {
+            // Mantener la imagen actual
+            const existingProduct = getProductById(currentProductId);
+            if (existingProduct && existingProduct.imageBase64) {
+              productData.imageBase64 = existingProduct.imageBase64;
+            }
+          } else if (imageFile) {
+            // Nueva imagen seleccionada
+            try {
+              productData.imageBase64 = await convertImageToBase64(imageFile);
+            } catch (error) {
+              showAlert('error', 'Error al procesar la imagen');
+              return;
+            }
+          } else {
+            // Sin imagen
+            productData.imageBase64 = undefined;
+          }
+        } 
+        // Para nuevo producto
+        else if (imageFile) {
+          try {
+            productData.imageBase64 = await convertImageToBase64(imageFile);
+          } catch (error) {
+            showAlert('error', 'Error al procesar la imagen');
+            return;
+          }
+        }
+        
+        let result;
+        
+        // Crear o actualizar el producto
+        if (editMode && currentProductId) {
+          result = updateProduct(currentProductId, productData);
+        } else {
+          result = createProduct(productData);
+        }
+        
+        if (result.success) {
+          showAlert('success', result.message);
+          resetForm();
+          
+          // Actualizar la lista de productos dinámicamente
+          updateProductList();
+        } else {
+          showAlert('error', result.message);
+        }
+      });
+    }
+    
+    // Cancelar edición
+    const cancelButton = document.getElementById('cancelButton');
+    if (cancelButton) {
+      cancelButton.addEventListener('click', resetForm);
+    }
+    
+    // Verificar acceso de administrador
+    document.addEventListener('DOMContentLoaded', () => {
+      // Inicializar el array de productos si no existe
+      const productsStr = localStorage.getItem('products');
+      if (!productsStr) {
+        localStorage.setItem('products', JSON.stringify([]));
+        console.log('Array de productos inicializado');
+      }
+      
+      // Verificar autenticación
+      const userDataStr = localStorage.getItem('freshbites_current_user');
+      if (!userDataStr) {
+        window.location.href = '/login';
+        return;
+      }
+      
+      try {
+        const userData = JSON.parse(userDataStr);
+        if (userData.role !== 'admin') {
+          window.location.href = '/user/home';
+        } else {
+          // Actualizar la lista de productos para asegurar que muestra los datos más recientes
+          updateProductList();
+          // Configurar event listeners 
+          setupEventListeners();
+        }
+      } catch (error) {
+        window.location.href = '/login';
+      }
+    });
+  </script>
+</MainLayout>

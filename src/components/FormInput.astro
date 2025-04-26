@@ -1,0 +1,36 @@
+---
+export interface Props {
+  type: string;
+  name: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  error?: string;
+  required?: boolean;
+}
+
+const { 
+  type = 'text', 
+  name, 
+  label, 
+  value, 
+  placeholder = '', 
+  error = '', 
+  required = false 
+} = Astro.props;
+---
+
+<div class="mb-4">
+  <label for={name} class="block text-sm font-medium text-gray-700 mb-1">
+    {label} {required && <span class="text-red-500">*</span>}
+  </label>
+  <input
+    type={type}
+    id={name}
+    name={name}
+    value={value}
+    placeholder={placeholder}
+    class={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-green-500'}`}
+  />
+  {error && <p class="mt-1 text-sm text-red-500">{error}</p>}
+</div>
