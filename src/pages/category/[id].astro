@@ -5,6 +5,9 @@ import ProductCard from '../../components/ProductCard.astro';
 // import { getProducts } from '../../services/productService';
 // import { getCategoryById } from '../../services/categoryService';
 
+// Configurar la página para renderizado en servidor en lugar de estático
+export const prerender = false;
+
 // Obtener el ID de la categoría de la URL
 const { id } = Astro.params;
 ---
@@ -26,6 +29,7 @@ const { id } = Astro.params;
               </div>
             </div>
           ))}
+
         </div>
       </div>
     </div>
