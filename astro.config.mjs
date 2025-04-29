@@ -9,5 +9,10 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   output: "server",
-  adapter: vercel(),
+  adapter: vercel({
+    analytics: true,
+    // Habilitar estos ajustes podría ayudar con el manejo de rutas
+    // includeFiles: ['./dist/**/*'],
+    // functionPerRoute: false
+  }),
 });
