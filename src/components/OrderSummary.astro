@@ -1,0 +1,104 @@
+---
+import { Order } from '../services/orderService';
+
+export interface Props {
+  order: Order;
+  isExpanded?: boolean;
+}
+
+const { order, isExpanded = false } = Astro.props;
+
+// Función para formatear precios
+function formatPrice(price: number) {
+  return new Intl.NumberFormat('es-CR', {
+    style: 'currency',
+    currency: 'CRC'
+  }).format(price);
+}
+
+// Formatear fecha
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('es-CR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+---
+
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-4">
+  <div class="p-4 bg-green-50 border-b border-gray-200">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+      <div>
+        <h3 class="font-medium text-gray-800">Pedido #{order.id.substring(6, 14)}</h3>
+        <p class="text-sm text-gray-600">{formatDate(order.date)}</p>
+      </div>
+      <div class="mt-2 md:mt-0">
+        <span class="font-bold text-green-600">{formatPrice(order.total)}</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class={`p-4 ${isExpanded ? 'block' : 'hidden'}`} data-order-details id={`order-details-${order.id}`}>
+    <h4 class="font-medium text-gray-800 mb-2">Productos:</h4>
+    <ul class="divide-y divide-gray-200">
+      {order.items.map(item => (
+        <li class="py-2">
+          <div class="flex justify-between">
+            <span class="text-gray-800">{item.name} x{item.quantity}</span>
+            <span class="text-gray-600">{formatPrice(item.price * item.quantity)}</span>
+          </div>
+          <div class="text-sm text-gray-500">
+            Precio unitario: {formatPrice(item.price)}
+          </div>
+        </li>
+      ))}
+    </ul>
+    
+    <div class="mt-4 pt-3 border-t border-gray-200">
+      <div class="flex justify-between font-medium">
+        <span class="text-gray-800">Total:</span>
+        <span class="text-green-600">{formatPrice(order.total)}</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="p-3 bg-gray-50 border-t border-gray-200">
+    <button 
+      class="text-sm text-blue-600 hover:text-blue-800 focus:outline-none w-full text-center"
+      data-toggle-details
+      data-order-id={order.id}
+    >
+      <span data-show-text>Ver detalles</span>
+      <span data-hide-text class="hidden">Ocultar detalles</span>
+    </button>
+  </div>
+</div>
+
+<script define:vars={{ orderId: order.id }}>
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggleBtn = document.querySelector(`[data-toggle-details][data-order-id="${orderId}"]`);
+    const detailsContainer = document.querySelector(`#order-details-${orderId}`);
+    const showText = toggleBtn?.querySelector('[data-show-text]');
+    const hideText = toggleBtn?.querySelector('[data-hide-text]');
+    
+    if (toggleBtn && detailsContainer && showText && hideText) {
+      toggleBtn.addEventListener('click', () => {
+        const isHidden = detailsContainer.classList.contains('hidden');
+        
+        if (isHidden) {
+          detailsContainer.classList.remove('hidden');
+          showText.classList.add('hidden');
+          hideText.classList.remove('hidden');
+        } else {
+          detailsContainer.classList.add('hidden');
+          showText.classList.remove('hidden');
+          hideText.classList.add('hidden');
+        }
+      });
+    }
+  });
+</script>

@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import { getCurrentUser, logoutUser } from "../services/auth";
+import { getCartItemCount } from "../services/cartService";
 
 export interface Props {
   title: string;
@@ -24,15 +25,42 @@ const { title } = Astro.props;
       <div class="flex justify-between h-16">
         <div class="flex items-center">
           <div class="flex-shrink-0 flex items-center">
-            <span class="text-2xl font-bold text-green-600">FreshBites</span>
+            <a href="/user/home" class="text-2xl font-bold text-green-600">FreshBites</a>
           </div>
         </div>
         <div class="flex items-center">
           <div class="flex items-center gap-4">
             <span id="userName" class="text-sm font-medium text-gray-700">Cargando...</span>
-            <button id="logoutBtn" class="px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-              Cerrar Sesión
-            </button>
+            
+            <!-- Botón del carrito -->
+            <a href="/user/cart" class="relative p-1.5 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500" id="cartButton">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <span id="cartCount" class="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
+                0
+              </span>
+            </a>
+            
+            <!-- Menú de usuario -->
+            <div class="relative inline-block text-left" id="userMenu">
+              <button type="button" class="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500" id="userMenuButton" aria-expanded="false" aria-haspopup="true">
+                Mi cuenta
+                <svg class="-mr-1 ml-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </button>
+
+              <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10" id="userMenuDropdown" role="menu" aria-orientation="vertical" aria-labelledby="userMenuButton" tabindex="-1">
+                <div class="py-1" role="none">
+                  <a href="/user/home" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Inicio</a>
+                  <a href="/user/orders" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">Mis pedidos</a>
+                  <button id="logoutBtn" class="text-gray-700 block w-full text-left px-4 py-2 text-sm hover:bg-gray-100" role="menuitem" tabindex="-1">
+                    Cerrar sesión
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -56,6 +84,8 @@ const { title } = Astro.props;
   </footer>
 
   <script>
+    import { getCartItemCount } from '../services/cartService';
+    
     // Check if user is logged in
     function getCurrentUser() {
       const userStr = localStorage.getItem('freshbites_current_user');
@@ -65,6 +95,22 @@ const { title } = Astro.props;
     function logout() {
       localStorage.removeItem('freshbites_current_user');
       window.location.href = '/login';
+    }
+
+    // Actualizar contador del carrito
+    function updateCartCount() {
+      const cartCountElement = document.getElementById('cartCount');
+      if (cartCountElement) {
+        const count = getCartItemCount();
+        cartCountElement.textContent = count.toString();
+        
+        // Ocultar contador si no hay productos
+        if (count === 0) {
+          cartCountElement.classList.add('hidden');
+        } else {
+          cartCountElement.classList.remove('hidden');
+        }
+      }
     }
 
     // Update UI with user info
@@ -80,12 +126,32 @@ const { title } = Astro.props;
       if (userNameElement) {
         userNameElement.textContent = user.name;
       }
+      
+      // Actualizar contador del carrito
+      updateCartCount();
     }
 
     // Add logout functionality
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
         logout();
+      });
+    }
+    
+    // Menú desplegable de usuario
+    const userMenuButton = document.getElementById('userMenuButton');
+    const userMenuDropdown = document.getElementById('userMenuDropdown');
+    
+    if (userMenuButton && userMenuDropdown) {
+      userMenuButton.addEventListener('click', () => {
+        userMenuDropdown.classList.toggle('hidden');
+      });
+      
+      // Cerrar el menú al hacer clic fuera
+      document.addEventListener('click', (event) => {
+        if (!userMenuButton.contains(event.target) && !userMenuDropdown.contains(event.target)) {
+          userMenuDropdown.classList.add('hidden');
+        }
       });
     }
   </script>

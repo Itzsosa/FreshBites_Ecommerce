@@ -1,0 +1,80 @@
+---
+// Definición de props para el componente CartItem
+export interface Props {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  imageBase64?: string;
+}
+
+const { productId, name, price, quantity, imageBase64 } = Astro.props;
+
+// Formatear precio
+function formatPrice(value: number) {
+  return new Intl.NumberFormat('es-CR', {
+    style: 'currency',
+    currency: 'CRC'
+  }).format(value);
+}
+---
+
+<div class="flex flex-col sm:flex-row items-center p-4 gap-3 border-b border-gray-200 last:border-0">
+  <div class="w-20 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+    {imageBase64 ? (
+      <img src={imageBase64} alt={name} class="w-full h-full object-cover" />
+    ) : (
+      <div class="w-full h-full flex items-center justify-center text-gray-400">
+        <span>Sin imagen</span>
+      </div>
+    )}
+  </div>
+  
+  <div class="flex-grow sm:ml-4 text-center sm:text-left">
+    <h3 class="text-lg font-medium text-gray-900">{name}</h3>
+    <p class="text-green-600 font-medium">{formatPrice(price)}</p>
+  </div>
+  
+  <div class="flex items-center gap-2">
+    <label class="text-sm text-gray-600 mr-2 whitespace-nowrap">Cantidad:</label>
+    <div class="flex border border-gray-300 rounded-md">
+      <button 
+        class="px-3 py-1 text-gray-600 hover:bg-gray-100 focus:outline-none" 
+        data-action="decrease"
+        data-product-id={productId}
+      >
+        -
+      </button>
+      <input
+        type="number"
+        min="1"
+        value={quantity}
+        class="w-12 text-center border-0 focus:outline-none focus:ring-0"
+        data-product-id={productId}
+        data-product-quantity
+      />
+      <button 
+        class="px-3 py-1 text-gray-600 hover:bg-gray-100 focus:outline-none" 
+        data-action="increase"
+        data-product-id={productId}
+      >
+        +
+      </button>
+    </div>
+  </div>
+  
+  <div class="flex items-center gap-3 ml-0 sm:ml-4">
+    <span class="font-medium whitespace-nowrap">
+      {formatPrice(price * quantity)}
+    </span>
+    <button 
+      class="text-red-500 hover:text-red-700 focus:outline-none"
+      data-action="remove"
+      data-product-id={productId}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      </svg>
+    </button>
+  </div>
+</div>

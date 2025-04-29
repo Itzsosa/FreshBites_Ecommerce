@@ -7,23 +7,7 @@ import ProductGrid from '../../components/ProductGrid.astro';
 
 <MainLayout title="FreshBites - Productos">
   <div class="bg-white rounded-lg shadow-md p-6">
-    <h1 class="text-2xl font-bold text-gray-800 mb-6">Bienvenido a FreshBites</h1>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <div class="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-lg shadow-sm">
-        <h2 class="text-xl font-semibold text-green-800 mb-2">Tu cuenta</h2>
-        <p class="text-green-700" id="welcomeMessage">¡Bienvenido! Gracias por unirte a FreshBites.</p>
-        <p class="text-green-700 mt-2">Explora nuestros productos frescos y saludables.</p>
-      </div>
-      
-      <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg shadow-sm">
-        <h2 class="text-xl font-semibold text-blue-800 mb-2">Carrito de compras</h2>
-        <p class="text-blue-700" id="cartStatus">Tu carrito está vacío.</p>
-        <button class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" id="viewCartBtn">
-          Ver carrito
-        </button>
-      </div>
-    </div>
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">Nuestros Productos</h1>
     
     <!-- Componente de categorías -->
     <div class="mb-8">
@@ -42,7 +26,7 @@ import ProductGrid from '../../components/ProductGrid.astro';
     </div>
     
     <!-- Todos los productos por categoría -->
-    <h2 class="text-xl font-semibold text-gray-800 mb-4">Nuestros Productos</h2>
+    <h2 class="text-xl font-semibold text-gray-800 mb-4">Todos los Productos</h2>
     <div id="all-products-container">
       <div class="text-center py-6 bg-gray-50 rounded-lg">
         <p class="text-gray-500">Cargando productos...</p>
@@ -50,7 +34,14 @@ import ProductGrid from '../../components/ProductGrid.astro';
     </div>
   </div>
 
+  <!-- Toast de notificación -->
+  <div id="toast" class="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300">
+    <p id="toast-message">Producto añadido al carrito</p>
+  </div>
+
   <script>
+    import { addToCart, getCartItemCount } from '../../services/cartService';
+    
     // User page protection
     function checkUserAuth() {
       const userStr = localStorage.getItem('freshbites_current_user');
@@ -100,6 +91,28 @@ import ProductGrid from '../../components/ProductGrid.astro';
       }).format(price);
     }
 
+    // Mostrar toast de notificación
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toast-message');
+      
+      if (toast && toastMessage) {
+        toast.classList.remove('translate-y-20', 'opacity-0', 'bg-green-600', 'bg-red-600');
+        toast.classList.add(isError ? 'bg-red-600' : 'bg-green-600');
+        toastMessage.textContent = message;
+        
+        setTimeout(() => {
+          toast.classList.remove('translate-y-20', 'opacity-0');
+          toast.classList.add('translate-y-0', 'opacity-100');
+        }, 10);
+        
+        setTimeout(() => {
+          toast.classList.remove('translate-y-0', 'opacity-100');
+          toast.classList.add('translate-y-20', 'opacity-0');
+        }, 3000);
+      }
+    }
+
     // Crear tarjeta de producto HTML
     function createProductCard(product) {
       const category = getCategoryById(product.categoryId);
@@ -138,6 +151,22 @@ import ProductGrid from '../../components/ProductGrid.astro';
       `;
     }
 
+    // Actualizar contador del carrito
+    function updateCartCount() {
+      const cartCountElement = document.getElementById('cartCount');
+      if (cartCountElement) {
+        const count = getCartItemCount();
+        cartCountElement.textContent = count.toString();
+        
+        // Ocultar contador si no hay productos
+        if (count === 0) {
+          cartCountElement.classList.add('hidden');
+        } else {
+          cartCountElement.classList.remove('hidden');
+        }
+      }
+    }
+
     // Renderizar productos destacados
     function renderFeaturedProducts() {
       const featuredContainer = document.getElementById('featured-products-container');
@@ -158,6 +187,9 @@ import ProductGrid from '../../components/ProductGrid.astro';
           </div>
         `;
       }
+      
+      // Agregar eventos a los botones
+      addAddToCartEvents();
     }
 
     // Renderizar todos los productos por categoría
@@ -206,14 +238,26 @@ import ProductGrid from '../../components/ProductGrid.astro';
           </div>
         `)
         .join('');
-        
-      // Agregar eventos a los botones de "Agregar"
+      
+      // Agregar eventos a los botones
+      addAddToCartEvents();
+    }
+    
+    // Función para añadir eventos a los botones "Agregar"
+    function addAddToCartEvents() {
       document.querySelectorAll('[data-product-id]').forEach(button => {
         button.addEventListener('click', (e) => {
           const productId = e.currentTarget.getAttribute('data-product-id');
           if (productId) {
-            // Aquí se puede implementar la lógica del carrito
-            alert(`Producto agregado al carrito: ${productId}`);
+            const products = getProducts();
+            const product = products.find(p => p.id === productId);
+            
+            if (product && addToCart(product)) {
+              showToast(`${product.name} añadido al carrito`);
+              updateCartCount();
+            } else {
+              showToast('No se pudo añadir el producto', true);
+            }
           }
         });
       });
@@ -224,12 +268,6 @@ import ProductGrid from '../../components/ProductGrid.astro';
       // Check authentication
       const user = checkUserAuth();
       if (!user) return;
-      
-      // Update welcome message
-      const welcomeMessage = document.getElementById('welcomeMessage');
-      if (welcomeMessage) {
-        welcomeMessage.textContent = `¡Bienvenido, ${user.name}! Gracias por unirte a FreshBites.`;
-      }
       
       // Renderizar productos
       renderFeaturedProducts();
